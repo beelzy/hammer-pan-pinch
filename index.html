@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1, minimal-ui">
+  <title>Hammer Pinch/Pan test</title>
+</head>
+<body>
+  <style>
+    .wrapper {
+      height: 500px;
+      position: absolute;
+      width: 100%;
+      overflow: hidden;
+    }
+    .static {
+      opacity: 0.5;
+    }
+    .zoomable, .static {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      background: url('wwganondorf.jpg');
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: 50% 50%;
+    }
+  </style>
+  <div class="wrapper">
+    <div class="static"></div>
+    <div class="zoomable"></div>
+  </div>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+<script src="hammer.js"></script>
+<script>
+  /**
+  Very basic zoom to pinch and panning sample. Includes ability to pan and pinch at the same time and restrict panning region.
+  */
+
+  /** @type double Original zoom level before the start of a pinch.*/
+  var initialScale = 1;
+
+  /** @type double Current zoom level while pinching. */
+  var currentScale = 1;
+
+  /** @type double Current X coordinate while panning */
+  var panX = 0;
+
+  /** @type double Current Y coordinate while panning */
+  var panY = 0;
+
+  /** @type double Difference between X coordinate and image X coordinate at the beginning of pan event */
+  var deltaX = 0;
+
+  /** @type double Difference between Y coordinate and image Y coordinate at the beginning of pan event */
+  var deltaY = 0;
+
+  /** @type double X coordinate of the image at the end of the pan event */
+  var originX = 0;
+
+  /** @type double Y coordinate of the image at the end of the pan event */
+  var originY = 0;
+
+  //Compensate for shift in e.center when number of pointers changes
+  var pointerCount = 0;
+  var centerOffsetX = 0;
+  var centerOffsetY = 0;
+
+  $('document').ready(function() {
+    var zoom = $('.zoomable');
+    var wrapper = $('.wrapper');
+    var image = new Image();
+    image.src = "wwganondorf.jpg";
+    var aspectRatio = 1;
+    var originalWidth = 0;
+    var originalHeight = 0;
+
+    image.onload = function() {
+      aspectRatio = this.width/this.height;
+      originalHeight = Math.min(wrapper.width()/aspectRatio, wrapper.height());
+      originalWidth = originalHeight * aspectRatio;
+    var hammertime = new Hammer(zoom[0], {drag_max_touches: 2,});
+
+    hammertime.add(new Hammer.Pan(), {threshold: 0, pointers: 0});
+    hammertime.add(new Hammer.Pinch(), {threshold: 0}).recognizeWith(hammertime.get('pan'));
+    hammertime.on('pinch pinchend pinchcancel', function(e) {
+      currentScale = e.scale * initialScale;
+      currentScale = Math.min(Math.max(currentScale, 1), 5);
+      pointerCount = e.pointers.length;
+      console.info('pinch', originX, originY);
+      pan(e);
+      if (e.type === 'pinchend' || e.type === 'pinchcancel') {
+        initialScale = currentScale;
+        restrictPosition(e);
+        originX = panX;
+        originY = panY;
+      }
+      requestUpdate();
+    }).on('panstart pinchstart', function(e) {
+      deltaX = e.center.x - originX;
+      deltaY = e.center.y - originY;
+      console.info('pan', originX, originY);
+    }).on('panstart pan panend pancancel', pan);
+    };
+
+    var pan = function(e) {
+      if (pointerCount !== e.pointers.length) {
+        pointerCount = e.pointers.length;
+        var oldPanX = panX;
+        var oldPanY = panY;
+        panX = (e.center.x - deltaX)/currentScale;
+        panY = (e.center.y - deltaY)/currentScale;
+        centerOffsetX = panX - oldPanX;
+        centerOffsetY = panY - oldPanY;
+      }
+      panX = (e.center.x - deltaX)/currentScale - centerOffsetX;
+      panY = (e.center.y - deltaY)/currentScale - centerOffsetY;
+
+      //restrict
+      restrictPosition(e);
+
+      if (e.type === 'panend' || e.type === 'pancancel') {
+        originX = panX*currentScale;
+        originY = panY*currentScale;
+        centerOffsetX = 0;
+        centerOffsetY = 0;
+      }
+      requestUpdate();
+    };
+
+    var restrictPosition = function(e) {
+      if (Math.abs(panX * currentScale) > Math.abs((originalWidth * (currentScale-1))/2)) {
+        var direction = 1;
+        if (panX < 0) {
+          direction = -1;
+        }
+        panX = direction*((originalWidth * (currentScale-1))/2)/currentScale;
+
+      }
+      if (Math.abs(panY * currentScale) > Math.abs((originalHeight * (currentScale-1))/2)) {
+        var direction = 1;
+        if (panY < 0) {
+          direction = -1;
+        }
+        panY = direction*((originalHeight * (currentScale-1))/2)/currentScale;
+      }
+    }
+
+    var requestUpdate = function() {
+      zoom.css('transform', 'scale('+currentScale+') translate3d('+panX+'px, '+panY+'px, 0)');
+    }
+  });
+  </script>
+</body>
+</html>
