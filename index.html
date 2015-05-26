@@ -153,8 +153,8 @@
     *  calculated by the initial position of the image at 100% zoom.
     */
     var restrictPosition = function(e) {
+      var direction = 1;
       if (Math.abs(panX * currentScale) > Math.abs((originalWidth * (currentScale-1))/2)) {
-        var direction = 1;
         if (panX < 0) {
           direction = -1;
         }
@@ -162,7 +162,7 @@
 
       }
       if (Math.abs(panY * currentScale) > Math.abs((originalHeight * (currentScale-1))/2)) {
-        var direction = 1;
+        direction = 1;
         if (panY < 0) {
           direction = -1;
         }
