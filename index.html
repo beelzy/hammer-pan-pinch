@@ -66,6 +66,7 @@
   var centerOffsetY = 0;
 
   $('document').ready(function() {
+    // setup
     var zoom = $('.zoomable');
     var wrapper = $('.wrapper');
     var image = new Image();
@@ -74,35 +75,62 @@
     var originalWidth = 0;
     var originalHeight = 0;
 
+    // attach listeners after image loads
     image.onload = function() {
+
+      // obtain image dimensions and aspect ratio
       aspectRatio = this.width/this.height;
       originalHeight = Math.min(wrapper.width()/aspectRatio, wrapper.height());
       originalWidth = originalHeight * aspectRatio;
-    var hammertime = new Hammer(zoom[0], {drag_max_touches: 2,});
 
-    hammertime.add(new Hammer.Pan(), {threshold: 0, pointers: 0});
-    hammertime.add(new Hammer.Pinch(), {threshold: 0}).recognizeWith(hammertime.get('pan'));
-    hammertime.on('pinch pinchend pinchcancel', function(e) {
-      currentScale = e.scale * initialScale;
-      currentScale = Math.min(Math.max(currentScale, 1), 5);
-      pointerCount = e.pointers.length;
-      console.info('pinch', originX, originY);
-      pan(e);
-      if (e.type === 'pinchend' || e.type === 'pinchcancel') {
+      var hammertime = new Hammer(zoom[0], {drag_max_touches: 2,});
+
+      hammertime.add(new Hammer.Pan(), {threshold: 0, pointers: 0});
+      hammertime.add(new Hammer.Pinch(), {threshold: 0}).recognizeWith(hammertime.get('pan'));
+
+      hammertime.on('pinch', function(e) {
+        // limit zoom level between 1 and 5
+        currentScale = e.scale * initialScale;
+        currentScale = Math.min(Math.max(currentScale, 1), 5);
+        pointerCount = e.pointers.length;
+        // update image position while zooming
+        immediatePan(e);
+        requestUpdate();
+      }).on('pinchend pinchcancel', function(e) {
+        // update variables on pinch end
         initialScale = currentScale;
         restrictPosition(e);
         originX = panX;
         originY = panY;
-      }
-      requestUpdate();
-    }).on('panstart pinchstart', function(e) {
-      deltaX = e.center.x - originX;
-      deltaY = e.center.y - originY;
-      console.info('pan', originX, originY);
-    }).on('panstart pan panend pancancel', pan);
+        requestUpdate();
+      }).on('panstart pinchstart', function(e) {
+        // set difference between event gesture center and image position to prevent image jumping directly to gesture center
+        deltaX = e.center.x - originX;
+        deltaY = e.center.y - originY;
+      }).on('pan', pan).on('panend pancancel', function(e) {
+        originX = panX*currentScale;
+        originY = panY*currentScale;
+        centerOffsetX = 0;
+        centerOffsetY = 0;
+        requestUpdate();
+      });
     };
 
+    /**
+    * Update image position and refresh display
+    * @param {event} e gesture event
+    */
     var pan = function(e) {
+      immediatePan(e);
+      requestUpdate();
+    };
+
+    /**
+    * Main method to update image position while panning.
+    * @param {event} e gesture event
+    */
+    var immediatePan = function(e) {
+      // detect change in number of pointers and compensate for change in center coordinates
       if (pointerCount !== e.pointers.length) {
         pointerCount = e.pointers.length;
         var oldPanX = panX;
@@ -117,16 +145,13 @@
 
       //restrict
       restrictPosition(e);
-
-      if (e.type === 'panend' || e.type === 'pancancel') {
-        originX = panX*currentScale;
-        originY = panY*currentScale;
-        centerOffsetX = 0;
-        centerOffsetY = 0;
-      }
-      requestUpdate();
     };
 
+    /**
+    *
+    * Restrict the current position of the image within boundaries. Boundaries are
+    *  calculated by the initial position of the image at 100% zoom.
+    */
     var restrictPosition = function(e) {
       if (Math.abs(panX * currentScale) > Math.abs((originalWidth * (currentScale-1))/2)) {
         var direction = 1;
@@ -145,8 +170,15 @@
       }
     }
 
+    /**
+    * update image position and scale
+    */
     var requestUpdate = function() {
-      zoom.css('transform', 'scale('+currentScale+') translate3d('+panX+'px, '+panY+'px, 0)');
+      var transformString = 'scale('+currentScale+') translate3d('+panX+'px, '+panY+'px, 0)';
+      zoom.css('transform', transformString)
+        .css('-webkit-transform', transformString)
+        .css('-moz-transform', transformString)
+        .css('-o-transform', transformString);
     }
   });
   </script>
